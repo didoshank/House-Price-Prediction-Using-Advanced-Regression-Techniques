@@ -1,0 +1,1595 @@
+---
+title: 'Prediction of Sales Prices of Houses'
+output:
+  html_document:
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+  pdf_document: default
+  word_document: default
+---
+### Reg. No and Name:
+
+  19BPS1012 Apurv Doddamani
+  
+  19BPS1048 Anushka Pandey
+  
+  19BPS1092 Mithun P
+
+* * *
+### Dataset Description
+
+### Name of the Dataset : Housing Data of Ames, Iowa
+
+* * *
+
+### Dataset Exploration
+### Loading Libraries
+
+```{r}
+
+pacman::p_load(corrplot)
+pacman::p_load(ggplot2)
+pacman::p_load(ggpubr)
+pacman::p_load(tinytex)
+pacman::p_load(tidyverse)
+pacman::p_load(Metrics)
+pacman::p_load(xgboost)
+pacman::p_load(caret)
+pacman::p_load(glmnet)
+
+
+
+```
+### Reading Data
+
+```{r}
+
+df<-read.csv("D:/COllege/5th sem/CSE3505/Project/train.csv",na.strings = "NA",header = TRUE)
+head(df)
+
+
+```
+### Plotting Sales Price
+
+```{r}
+
+options(scipen=10000)
+ggplot(df,aes(SalePrice,fill = ..count..))+geom_histogram(binwidth = 5000)
+
+
+df$log_SalePrice<-log(df$SalePrice)
+ggplot(df,aes(df$log_SalePrice,fill = ..count..))+geom_histogram()
+
+
+```
+
+
+### Making GGplot and looking for linear relations
+
+```{r}
+ggplot(df,aes(x=TotRmsAbvGrd,y=SalePrice)) + geom_point() + geom_smooth(method ='lm', se=FALSE)
+ggplot(df,aes(x=GrLivArea ,y=SalePrice)) + geom_point() + geom_smooth(method ='lm', se=FALSE)
+ggplot(df,aes(x=LotArea ,y=SalePrice)) + geom_point() + geom_smooth(method ='lm', se=FALSE)
+ggplot(df,aes(x=TotalBsmtSF,y=SalePrice)) + geom_point() + geom_smooth(method ='lm', se=FALSE)
+
+```
+
+#### There doesnt exist a linear relation with plotted variables
+
+### Checking for NA values
+
+```{r}
+
+df_train_na <- as.data.frame(sapply(df, function(x) sum(is.na(x)))) %>%
+  rename('na_values'='sapply(df, function(x) sum(is.na(x)))') %>% arrange(desc(na_values)) %>%
+  mutate('na_percentage' = na_values/1460 *100 ) %>% filter(na_values >0)
+df_train_na
+
+```
+### Imputing Certain Required Features
+
+```{r}
+df$LotFrontage[is.na(df$LotFrontage)]<-mean(df$LotFrontage, na.rm = TRUE)
+sum(is.na(df$LotFrontage))
+
+```
+
+```{r}
+df$MasVnrArea[is.na(df$MasVnrArea)]<-mean(df$MasVnrArea, na.rm = TRUE)
+sum(is.na(df$MasVnrArea))
+
+```
+
+### PLotting the correlation Graph
+
+```{r}
+
+house_price_num<-df[, sapply(df, is.numeric)]
+Correlation<-cor(na.omit(house_price_num))
+corrplot(Correlation, method = "square")
+head(Correlation)
+
+
+```
+
+### Plotting the Graphs for Some variables
+
+```{r}
+
+predict_var<-house_price_num[c("OverallQual","TotalBsmtSF","X1stFlrSF", "GrLivArea", "GarageArea","GarageCars","SalePrice")]
+plot(predict_var)
+
+
+```
+
+
+### Making Multi Linear Model with Significant Predictors
+
+
+```{r}
+
+model<-lm(SalePrice~ OverallQual + GrLivArea + GarageArea + GarageCars + TotalBsmtSF + X1stFlrSF, data = house_price_num)
+summary(model)
+plot(model)
+
+
+```
+#### Through summary model we can notice the significant variables and make appropriate use of them
+
+### Evaluation Metrics
+
+
+```{r}
+
+k1=100*(sigma(model)/mean(house_price_num$SalePrice))
+cat("Percentage Error value",k1)
+
+RMSE1= mean((house_price_num$SalePrice - predict(model))^2) %>% sqrt()
+cat("\nRMSE value is",RMSE1)
+
+model_summ <-summary(model)
+
+RSE1 = sigma(model)
+cat("\nRMSE value is",RSE1)
+
+MSE1 = mean(model_summ$residuals^2)
+
+cat("\nMSE value is ", MSE1)
+
+cat("\nThe RSquared values", summary(model)$r.squared)
+
+cat("\nThe Adjusted RSquared values", summary(model)$adj.r.squared)
+
+
+
+```
+
+#### We can see over here that we got pretty good R squared and Adjusted R squared Values
+
+### Plotting Graph between actual and predicted value
+
+```{r}
+data_mod <- data.frame(Predicted = predict(model), 
+                       Observed = house_price_num$SalePrice)
+
+ggplot(data_mod,                                     
+       aes(x = Predicted,
+           y = Observed)) +
+  geom_point() +
+  geom_abline(intercept = 0,
+              color = "red",
+              size = 2)
+
+```
+
+
+#### As we can see here the graph plotted between the acutal and predicted variables 
+
+
+
+
+
+### Multi Linear Regression Model 2
+
+```{r}
+
+model2<-lm(SalePrice~ OverallQual + GrLivArea  + GarageCars + TotalBsmtSF + X1stFlrSF + FullBath + YearBuilt  + YearRemodAdd + MasVnrArea, data = house_price_num)
+summary(model2)
+plot(model2)
+
+
+```
+
+```{r}
+k2=100*(sigma(model2)/mean(house_price_num$SalePrice))
+cat("Percentage Error value",k2)
+
+RMSE2 = mean((house_price_num$SalePrice - predict(model2))^2) %>% sqrt()
+cat("\nRMSE value is",RMSE2)
+
+RSE2 = sigma(model2)
+cat("\nRMSE value is",RSE2)
+
+model_summ2 <-summary(model2)
+
+MSE2= mean(model_summ2$residuals^2)
+
+cat("\nMSE value is ", MSE2)
+
+
+cat("\nThe RSquared values", summary(model2)$r.squared)
+
+cat("\nThe Adjusted RSquared values", summary(model2)$adj.r.squared)
+
+```
+
+```{r}
+
+data_mod <- data.frame(Predicted = predict(model2), 
+                       Observed = house_price_num$SalePrice)
+
+ggplot(data_mod,                                     
+       aes(x = Predicted,
+           y = Observed)) +
+  geom_point() +
+  geom_abline(intercept = 0,
+              color = "red",
+              size = 2)
+
+
+```
+
+### Multi Linear Regression Model 3
+
+```{r}
+
+model3<-lm(SalePrice~ OverallQual + GrLivArea  + GarageCars + TotalBsmtSF + X1stFlrSF + FullBath + YearBuilt  +TotRmsAbvGrd + GarageArea + YearRemodAdd + MasVnrArea, data = house_price_num)
+summary(model3)
+plot(model3)
+
+
+```
+
+```{r}
+k3=100*(sigma(model3)/mean(house_price_num$SalePrice))
+cat("Percentage Error value",k3)
+
+RMSE3 = mean((house_price_num$SalePrice - predict(model3))^2) %>% sqrt()
+cat("\nRMSE value is",RMSE3)
+
+RSE3 = sigma(model3)
+cat("\nRMSE value is",RSE3)
+
+model_summ3 <-summary(model3)
+MSE3 = mean(model_summ3$residuals^2)
+
+cat("\nMSE value is ", MSE3)
+
+cat("\nThe RSquared values", summary(model3)$r.squared)
+
+cat("\nThe Adjusted RSquared values", summary(model3)$adj.r.squared)
+
+
+```
+
+
+```{r}
+
+data_mod <- data.frame(Predicted = predict(model3), 
+                       Observed = house_price_num$SalePrice)
+
+ggplot(data_mod,                                     
+       aes(x = Predicted,
+           y = Observed)) +
+  geom_point() +
+  geom_abline(intercept = 0,
+              color = "red",
+              size = 2)
+
+
+```
+
+
+#### Model 3 graph using some significantly related variables and we see that it can accurately predict certain values.
+
+### Evaluation Metric for Different Multi Linear Regression
+
+```{r}
+Model<-c("Model1","Model2","Model3")
+Error_Percentage<-c(k1,k2,k3)
+RSE<-c(RSE1,RSE2,RSE3)
+RMSE<-c(RMSE1,RMSE2,RMSE3)
+MSE<-c(MSE1,MSE2,MSE3)
+RSquared <- c(summary(model)$r.squared,summary(model2)$r.squared,summary(model3)$r.squared)
+ARSquared <- c(summary(model)$adj.r.squared,summary(model2)$adj.r.squared,summary(model3)$adj.r.squared)
+
+
+metricsdf<-data.frame(Model,Error_Percentage,RSE,RMSE,MSE,RSquared,ARSquared)
+metricsdf
+```
+
+
+#### We can see here that model 3 for Multilinear Regression has the Highest R-squared Values and lowest RSE, RMSE values
+
+## Polynomial Regression
+
+```{r}
+
+model4<-lm(SalePrice~ poly(OverallQual,2) + poly(GrLivArea,2)  + poly(GarageCars,1) + poly(TotalBsmtSF,2) + poly(X1stFlrSF,2) + poly(FullBath,3) + YearBuilt  +poly(TotRmsAbvGrd,4) + poly(GarageArea,4) + YearRemodAdd + poly(MasVnrArea,2), data = house_price_num)
+summary(model4)
+
+
+
+
+```
+
+
+#### We can see over here that by changing the degree of certain varaibles we can make the model more accurate
+
+
+
+
+### Evalutaion Metrics
+
+```{r}
+k4=100*(sigma(model4)/mean(house_price_num$SalePrice))
+cat("Percentage Error value",k4)
+
+RMSE4 = mean((house_price_num$SalePrice - predict(model4))^2) %>% sqrt()
+cat("\nRMSE value is",RMSE4)
+
+RSE4 = sigma(model4)
+cat("\nRMSE value is",RSE4)
+
+model_summ4 <-summary(model4)
+MSE4 = mean(model_summ4$residuals^2)
+
+cat("\nMSE value is ", MSE4)
+
+cat("\n The R Squared value is ", summary(model4)$r.squared)
+
+cat("\n The Adjusted R Squared value is ", summary(model4)$adj.r.squared)
+
+```
+
+
+### Evaluation Metric for Different Regression Techniques
+
+```{r}
+
+Model<-c("Model3","Model4")
+Error_Percentage<-c(k3,k4)
+RSE<-c(RSE3,RSE4)
+RMSE<-c(RMSE3,RMSE4)
+MSE<-c(MSE3,MSE4)
+RSquared <- c(summary(model3)$r.squared,summary(model4)$r.squared)
+ARSquared <- c(summary(model3)$adj.r.squared,summary(model4)$adj.r.squared)
+metricsdf<-data.frame(Model,Error_Percentage,RSE,RMSE,MSE,RSquared,ARSquared)
+metricsdf
+
+```
+
+
+
+#### Here we have compared the metrics between best Multilinear regression and Polynomial Regression. We see a significant decrease in error metrics and improvement in accuracy values for the polynomial regression hence it is better
+
+
+
+
+
+
+
+##   ------- Ridge, Lasso, ElasticNet----------
+
+#### These three methods are choosen so as to see if Lasso will eliminate many features which may have not had a big impact , and too see if it reduces overfitting. Ridge will reduce the impact of features that are not important in predicting our Salesprice values. Elastic Net combines feature elimination from Lasso and feature coefficient reduction from the Ridge model to improve our model’s predictions.
+
+#### We've explored if the above beliefs holds true to our dataset by building 3 models in each of the methods.
+
+```{r}
+
+df<-read.csv("D:/COllege/5th sem/CSE3505/Project/train.csv",na.strings = "NA",header = TRUE)
+head(df)
+
+```
+
+```{r}
+
+df$MasVnrArea[is.na(df$MasVnrArea)]<-mean(df$MasVnrArea, na.rm = TRUE)
+sum(is.na(df$MasVnrArea))
+
+```
+
+### ------------ Model - 1 ------------------
+
+```{r}
+
+df1 <- data.frame(df$SalePrice , df$OverallQual , df$GrLivArea  ,df$GarageCars,df$GarageArea ,df$TotalBsmtSF,df$X1stFlrSF)
+
+head(df1)
+
+
+```
+
+### Train/Set 80/20
+```{r}
+
+set.seed(123)
+size <- floor(0.8* nrow(df1))
+
+```
+
+
+### Training Dataset
+```{r}
+
+train_ind <- sample(seq_len(nrow(df1)), size = size)
+train <- df1[train_ind, ]
+xtrain <- train[,c(2,3,4,5,6,7)]
+ytrain <- train[,1]
+
+
+```
+
+### Testing Dataset
+
+```{r}
+
+test <- df1[-train_ind, ]
+xtest <- test[,c(2,3,4,5,6,7)]
+ytest <- test[,1]
+
+
+```
+
+### Selecting Lambda
+
+```{r}
+lambda.array <- seq(from = 0.01, to = 100, by = 0.01)
+
+```
+
+
+
+
+### Performing Ridge Regression
+
+```{r}
+
+ridgefit <- glmnet(xtrain,ytrain, alpha=0, lambda = lambda.array)
+summary(ridgefit)
+
+```
+
+```{r}
+plot(ridgefit, xvar= 'lambda', label = T)
+
+```
+### Predicted values:Ridge Regression:Model1
+```{r}
+y_predicted <- predict(ridgefit,s=min(lambda.array),newx = as.matrix(xtest))
+```
+
+### Co-efficients
+```{r}
+predict(ridgefit, s=min(lambda.array), newx = xtest, type = 'coefficients')
+```
+
+### R-Square:Ridge Regression:Model1
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted - ytest)^2)
+
+rsquare_ridge <- 1-(sse/sst)
+rsquare_ridge
+rsquare_ridge_1 <- rsquare_ridge
+```
+
+### Adjusted R-Square:Ridge Regression:Model1
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 6
+
+arsquare_ridge <- (1-((1-rsquare_ridge)*(n-1)/(n-p-1)))
+arsquare_ridge
+
+
+```
+
+### MSE:Ridge Regression:Model1
+```{r}
+MSE_ridge = (sum((y_predicted - ytest)^2) / length(y_predicted))
+MSE_ridge
+```
+
+### RMSE:Ridge Regression:Model1
+```{r}
+rmse_ridge <- sqrt(MSE_ridge)
+rmse_ridge
+```
+
+```{r}
+plot(ytest, y_predicted, main ='Predicted Vs Actual')
+```
+
+### MAE:Ridge Regression:Model1
+
+```{r}
+
+mae(ytest,y_predicted)
+```
+
+#### Ridge model 1 has a:
+#### MAE= 24183.42
+#### MSE= 1161124706
+#### RMSE = 34075.28
+#### Rsquare = 0.8167762
+#### Adj Rsquare = 0.8129188
+
+## Performing LASSO Regression
+
+```{r}
+lassofit <- glmnet(xtrain,ytrain, alpha =1, lambda = lambda.array)
+summary(lassofit)
+```
+
+### Lambdas in relation to coefficients
+```{r}
+plot(lassofit,xvar = 'lambda',label=T)
+```
+
+### Predicted values
+```{r}
+y_predicted_lasso <- predict(lassofit, s=min(lambda.array), newx = as.matrix(xtest))
+```
+
+### R-Square:LASSO Regression:Model1
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted_lasso - ytest)^2)
+
+rsquare_lasso <- 1-(sse/sst)
+rsquare_lasso
+```
+
+### Adjusted R-Square:LASSO Regression:Model1
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 6
+
+arsquare_lasso <- (1-((1-rsquare_lasso)*(n-1)/(n-p-1)))
+arsquare_lasso
+
+
+```
+
+### MSE:LASSO Regression:Model1
+```{r}
+MSE_lasso = (sum((y_predicted_lasso - ytest)^2) / length(y_predicted_lasso))
+MSE_lasso
+```
+
+### RMSE:LASSO Regression:Model1
+```{r}
+rmse_lasso <- sqrt(MSE_lasso)
+rmse_lasso
+```
+
+### MAE:LASSO Regression:Model1
+```{r}
+mae(ytest,y_predicted_lasso)
+```
+#### Lasso model 1 has a:
+#### MAE= 24183.42
+#### MSE= 1161124748
+#### RMSE = 34075.28
+#### Rsquare = 0.8167762
+#### Adj Rsquare = 0.8129188
+
+## Performing ElasticNet Regression
+```{r}
+elasticnetfit <- glmnet(xtrain,ytrain, alpha = 0.5, lambda = lambda.array)
+summary(elasticnetfit)
+```
+
+### Lambdas in relation to coefficients
+```{r}
+plot(elasticnetfit,xvar = 'lambda',label=T)
+```
+
+
+### Predicted values:ELASTIC NET Regression:Model1
+```{r}
+y_predicted_elasticnet <- predict(elasticnetfit, s=min(lambda.array), newx = as.matrix(xtest))
+```
+
+### R-Square:ELASTIC NET Regression:Model1
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted_elasticnet - ytest)^2)
+
+rsquare_elasticnet <- 1-(sse/sst)
+rsquare_elasticnet
+```
+
+### Adjusted R-Square:ELASTIC NET Regression:Model1
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 6
+
+arsquare_elasticnet <- (1-((1-rsquare_elasticnet)*(n-1)/(n-p-1)))
+arsquare_elasticnet
+
+
+```
+
+### MSE:ELASTIC NET Regression:Model1
+```{r}
+MSE_elasticnet = (sum((y_predicted_elasticnet - ytest)^2) / length(y_predicted_elasticnet))
+MSE_elasticnet
+```
+
+### RMSE:ELASTIC NET Regression:Model1
+```{r}
+rmse_elasticnet <- sqrt(MSE_elasticnet)
+rmse_elasticnet
+```
+
+### MAE:ELASTIC NET Regression:Model1
+```{r}
+
+mae(ytest,y_predicted_elasticnet)
+
+```
+
+#### Elastic net model 1 has a:
+#### MAE= 24183.42
+#### MSE= 1161124727
+#### RMSE = 34075.28
+#### Rsquare = 0.8167762
+#### Adj Rsquare = 0.8129188
+
+
+### ------------ Model - 2 ------------------
+
+```{r}
+
+df1 <- data.frame(df$SalePrice , df$OverallQual , df$GrLivArea  ,df$GarageCars,df$GarageArea ,df$TotalBsmtSF,df$X1stFlrSF ,df$FullBath ,df$YearBuilt  ,df$YearRemodAdd ,df$MasVnrArea)
+
+head(df1)
+
+
+```
+
+### Train/Set 80/20
+```{r}
+
+set.seed(123)
+size <- floor(0.8* nrow(df1))
+
+```
+
+
+### Training Dataset
+```{r}
+
+train_ind <- sample(seq_len(nrow(df1)), size = size)
+train <- df1[train_ind, ]
+xtrain <- train[,c(2,3,4,5,6,7,8,9,10,11)]
+ytrain <- train[,1]
+
+
+```
+
+### Testing Dataset
+
+```{r}
+
+test <- df1[-train_ind, ]
+xtest <- test[,c(2,3,4,5,6,7,8,9,10,11)]
+ytest <- test[,1]
+
+
+```
+
+### Selecting Lambda
+
+```{r}
+lambda.array <- seq(from = 0.01, to = 100, by = 0.01)
+
+```
+
+
+
+
+### Performing Ridge Regression
+
+```{r}
+
+ridgefit <- glmnet(xtrain,ytrain, alpha=0, lambda = lambda.array)
+summary(ridgefit)
+
+```
+
+```{r}
+plot(ridgefit, xvar= 'lambda', label = T)
+
+```
+### Predicted values:Ridge Regression:Model2
+```{r}
+y_predicted <- predict(ridgefit,s=min(lambda.array),newx = as.matrix(xtest))
+```
+
+### Co-efficients
+```{r}
+predict(ridgefit, s=min(lambda.array), newx = xtest, type = 'coefficients')
+```
+
+### R-Square:Ridge Regression:Model2
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted - ytest)^2)
+
+rsquare_ridge <- 1-(sse/sst)
+rsquare_ridge
+rsquare_ridge_1 <- rsquare_ridge
+```
+
+### Adjusted R-Square:Ridge Regression:Model2
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 10
+
+arsquare_ridge <- (1-((1-rsquare_ridge)*(n-1)/(n-p-1)))
+arsquare_ridge
+
+
+```
+
+### MSE:Ridge Regression:Model2
+```{r}
+MSE_ridge = (sum((y_predicted - ytest)^2) / length(y_predicted))
+MSE_ridge
+```
+
+### RMSE:Ridge Regression:Model2
+```{r}
+rmse_ridge <- sqrt(MSE_ridge)
+rmse_ridge
+```
+
+```{r}
+plot(ytest, y_predicted, main ='Predicted Vs Actual')
+```
+
+### MAE:Ridge Regression:Model2
+
+```{r}
+
+mae(ytest,y_predicted)
+```
+
+#### Ridge model 2 has a:
+#### MAE= 22787.67
+#### MSE= 1161124706
+#### RMSE = 32126.67
+#### Rsquare = 0.8167762
+#### Adj Rsquare = 0.8129188
+
+## Performing LASSO Regression
+
+```{r}
+lassofit <- glmnet(xtrain,ytrain, alpha =1, lambda = lambda.array)
+summary(lassofit)
+```
+
+### Lambdas in relation to coefficients
+```{r}
+plot(lassofit,xvar = 'lambda',label=T)
+```
+
+### Predicted values
+```{r}
+y_predicted_lasso <- predict(lassofit, s=min(lambda.array), newx = as.matrix(xtest))
+```
+
+### R-Square:LASSO Regression:Model2
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted_lasso - ytest)^2)
+
+rsquare_lasso <- 1-(sse/sst)
+rsquare_lasso
+```
+
+### Adjusted R-Square:LASSO Regression:Model2
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 10
+
+arsquare_lasso <- (1-((1-rsquare_lasso)*(n-1)/(n-p-1)))
+arsquare_lasso
+
+
+```
+
+### MSE:LASSO Regression:Model2
+```{r}
+MSE_lasso = (sum((y_predicted_lasso - ytest)^2) / length(y_predicted_lasso))
+MSE_lasso
+```
+
+### RMSE:LASSO Regression:Model2
+```{r}
+rmse_lasso <- sqrt(MSE_lasso)
+rmse_lasso
+```
+
+### MAE:LASSO Regression:Model2
+```{r}
+mae(ytest,y_predicted_lasso)
+```
+
+#### Lasso model 2 has a:
+#### MAE= 22787.67
+#### MSE= 1032123082
+#### RMSE = 32126.67
+#### Rsquare = 0.8371325
+#### Adj Rsquare = 0.8313365
+
+## Performing ElasticNet Regression
+```{r}
+elasticnetfit <- glmnet(xtrain,ytrain, alpha = 0.5, lambda = lambda.array)
+summary(elasticnetfit)
+```
+
+### Lambdas in relation to coefficients
+```{r}
+plot(elasticnetfit,xvar = 'lambda',label=T)
+```
+
+
+### Predicted values:ELASTIC NET Regression:Model2
+```{r}
+y_predicted_elasticnet <- predict(elasticnetfit, s=min(lambda.array), newx = as.matrix(xtest))
+```
+
+### R-Square:ELASTIC NET Regression:Model2
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted_elasticnet - ytest)^2)
+
+rsquare_elasticnet <- 1-(sse/sst)
+rsquare_elasticnet
+```
+
+### Adjusted R-Square:ELASTIC NET Regression:Model2
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 10
+
+arsquare_elasticnet <- (1-((1-rsquare_elasticnet)*(n-1)/(n-p-1)))
+arsquare_elasticnet
+
+
+```
+
+### MSE:ELASTIC NET Regression:Model2
+```{r}
+MSE_elasticnet = (sum((y_predicted_elasticnet - ytest)^2) / length(y_predicted_elasticnet))
+MSE_elasticnet
+```
+
+### RMSE:ELASTIC NET Regression:Model2
+```{r}
+rmse_elasticnet <- sqrt(MSE_elasticnet)
+rmse_elasticnet
+```
+
+### MAE:ELASTIC NET Regression:Model2
+```{r}
+
+mae(ytest,y_predicted_elasticnet)
+
+```
+
+#### Elasticnet model 2 has a:
+#### MAE= 22787.67
+#### MSE= 1032123044
+#### RMSE = 32126.67
+#### Rsquare = 0.8371325
+#### Adj Rsquare = 0.8313365
+
+
+### ------------ Model - 3 ------------------
+
+```{r}
+
+df1 <- data.frame(df$SalePrice , df$OverallQual , df$GrLivArea  ,df$GarageCars,df$GarageArea ,df$TotalBsmtSF,df$X1stFlrSF ,df$FullBath ,df$YearBuilt  ,df$YearRemodAdd ,df$MasVnrArea,df$TotRmsAbvGrd)
+
+head(df1)
+
+
+```
+
+### Train/Set 80/20
+```{r}
+
+set.seed(123)
+size <- floor(0.8* nrow(df1))
+
+```
+
+
+### Training Dataset
+```{r}
+
+train_ind <- sample(seq_len(nrow(df1)), size = size)
+train <- df1[train_ind, ]
+xtrain <- train[,c(2,3,4,5,6,7,8,9,10,11,12)]
+ytrain <- train[,1]
+
+
+```
+
+### Testing Dataset
+
+```{r}
+
+test <- df1[-train_ind, ]
+xtest <- test[,c(2,3,4,5,6,7,8,9,10,11,12)]
+ytest <- test[,1]
+
+
+```
+
+### Selecting Lambda
+
+```{r}
+lambda.array <- seq(from = 0.01, to = 100, by = 0.01)
+
+```
+
+
+
+
+## Performing Ridge Regression
+
+```{r}
+
+ridgefit <- glmnet(xtrain,ytrain, alpha=0, lambda = lambda.array)
+summary(ridgefit)
+
+```
+
+```{r}
+plot(ridgefit, xvar= 'lambda', label = T)
+
+```
+### Predicted values:Ridge Regression:Model3
+```{r}
+y_predicted <- predict(ridgefit,s=min(lambda.array),newx = as.matrix(xtest))
+```
+
+### Co-efficients
+```{r}
+predict(ridgefit, s=min(lambda.array), newx = xtest, type = 'coefficients')
+```
+
+### R-Square:Ridge Regression:Model3
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted - ytest)^2)
+
+rsquare_ridge <- 1-(sse/sst)
+rsquare_ridge
+rsquare_ridge_1 <- rsquare_ridge
+```
+
+### Adjusted R-Square:Ridge Regression:Model3
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 11
+
+arsquare_ridge <- (1-((1-rsquare_ridge)*(n-1)/(n-p-1)))
+arsquare_ridge
+
+
+```
+
+### MSE:Ridge Regression:Model3
+```{r}
+MSE_ridge = (sum((y_predicted - ytest)^2) / length(y_predicted))
+MSE_ridge
+```
+
+### RMSE:Ridge Regression:Model3
+```{r}
+rmse_ridge <- sqrt(MSE_ridge)
+rmse_ridge
+```
+
+```{r}
+
+plot(ytest, y_predicted, main ='Predicted Vs Actual')
+
+
+```
+
+### MAE:Ridge Regression:Model3
+
+```{r}
+
+mae(ytest,y_predicted)
+```
+
+#### Ridge model 3 has a:
+#### MAE=  22919.28
+#### MSE= 1046008518
+#### RMSE = 32342.05
+#### Rsquare = 0.8349414
+#### Adj Rsquare = 0.8284569
+
+## Performing LASSO Regression
+
+```{r}
+lassofit <- glmnet(xtrain,ytrain, alpha =1, lambda = lambda.array)
+summary(lassofit)
+```
+
+### Lambdas in relation to coefficients
+```{r}
+plot(lassofit,xvar = 'lambda',label=T)
+```
+
+### Predicted values
+```{r}
+y_predicted_lasso <- predict(lassofit, s=min(lambda.array), newx = as.matrix(xtest))
+```
+
+### R-Square:LASSO Regression:Model3
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted_lasso - ytest)^2)
+
+rsquare_lasso <- 1-(sse/sst)
+rsquare_lasso
+```
+
+### Adjusted R-Square:LASSO Regression:Model3
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 11
+
+arsquare_lasso <- (1-((1-rsquare_lasso)*(n-1)/(n-p-1)))
+arsquare_lasso
+
+
+```
+
+### MSE:LASSO Regression:Model3
+```{r}
+MSE_lasso = (sum((y_predicted_lasso - ytest)^2) / length(y_predicted_lasso))
+MSE_lasso
+```
+
+### RMSE:LASSO Regression:Model3
+```{r}
+rmse_lasso <- sqrt(MSE_lasso)
+rmse_lasso
+```
+
+### MAE:LASSO Regression:Model3
+```{r}
+mae(ytest,y_predicted_lasso)
+```
+
+#### Lasso model 3 has a:
+#### MAE=  22919.28
+#### MSE= 1046008312
+#### RMSE = 32342.05
+#### Rsquare = 0.8349414
+#### Adj Rsquare = 0.8284569
+
+## Performing ElasticNet Regression
+```{r}
+elasticnetfit <- glmnet(xtrain,ytrain, alpha = 0.5, lambda = lambda.array)
+summary(elasticnetfit)
+```
+
+### Lambdas in relation to coefficients
+```{r}
+plot(elasticnetfit,xvar = 'lambda',label=T)
+```
+
+
+### Predicted values:ELASTIC NET Regression:Model3
+```{r}
+y_predicted_elasticnet <- predict(elasticnetfit, s=min(lambda.array), newx = as.matrix(xtest))
+```
+
+### R-Square:ELASTIC NET Regression:Model3
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((y_predicted_elasticnet - ytest)^2)
+
+rsquare_elasticnet <- 1-(sse/sst)
+rsquare_elasticnet
+```
+
+### Adjusted R-Square:ELASTIC NET Regression:Model3
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 11
+
+arsquare_elasticnet <- (1-((1-rsquare_elasticnet)*(n-1)/(n-p-1)))
+arsquare_elasticnet
+
+
+```
+
+### MSE:ELASTIC NET Regression:Model3
+```{r}
+MSE_elasticnet = (sum((y_predicted_elasticnet - ytest)^2) / length(y_predicted_elasticnet))
+MSE_elasticnet
+```
+
+### RMSE:ELASTIC NET Regression:Model3
+```{r}
+rmse_elasticnet <- sqrt(MSE_elasticnet)
+rmse_elasticnet
+```
+
+### MAE:ELASTIC NET Regression:Model3
+```{r}
+
+mae(ytest,y_predicted_elasticnet)
+
+```
+#### Elastic Net model 3 has a:
+#### MAE=  22919.28
+#### MSE= 1046008427
+#### RMSE = 32342.05
+#### Rsquare = 0.8349414
+#### Adj Rsquare = 0.8284569
+
+### Printing the Evaluation metrics for different models
+
+```{r}
+
+model1 <- read.csv("D:\\COllege\\5th sem\\CSE3505\\Project\\Model1.csv")
+model1
+
+```
+
+
+```{r}
+
+model2 <- read.csv("D:\\COllege\\5th sem\\CSE3505\\Project\\Model2.csv")
+model2
+
+```
+
+```{r}
+
+model3 <- read.csv("D:\\COllege\\5th sem\\CSE3505\\Project\\Model3.csv")
+model3
+
+
+```
+
+
+
+
+## ------------ XGradient Boosting ------------------
+
+
+```{r}
+
+df<-read.csv("D:/COllege/5th sem/CSE3505/Project/train.csv",na.strings = "NA",header = TRUE)
+head(df)
+
+```
+
+```{r}
+
+df$MasVnrArea[is.na(df$MasVnrArea)]<-mean(df$MasVnrArea, na.rm = TRUE)
+sum(is.na(df$MasVnrArea))
+
+```
+
+### ------------ Model - 1 ------------------
+
+Preparing the data
+---
+```{r}
+
+df1 <- data.frame(df$SalePrice , df$OverallQual , df$GrLivArea  ,df$GarageCars,df$GarageArea ,df$TotalBsmtSF,df$X1stFlrSF)
+
+head(df1)
+
+
+```
+
+### Train/Set 80/20
+
+### After loading the dataset, first, we'll split them into the train and test parts, and extract x-input and y-label parts.
+
+```{r}
+
+set.seed(123)
+size <- floor(0.8* nrow(df1))
+
+```
+
+
+### Training Dataset
+```{r}
+
+train_ind <- sample(seq_len(nrow(df1)), size = size)
+train <- df1[train_ind, ]
+xtrain <- train[,c(2,3,4,5,6,7)]
+ytrain <- train[,1]
+
+
+```
+
+### Testing Dataset
+
+```{r}
+
+test <- df1[-train_ind, ]
+xtest <- test[,c(2,3,4,5,6,7)]
+ytest <- test[,1]
+
+
+xtrain <- as.matrix(xtrain)
+ytrain <- as.matrix(ytrain)
+xtest <- as.matrix(xtest)
+ytest <- as.matrix(ytest)
+
+
+```
+
+### XGB 
+
+The xgboost uses matrix data so that we need to convert our data into the xgb matrix type.
+ 
+```{r}
+
+xgb_train = xgb.DMatrix(data = xtrain, label = ytrain)
+xgb_test = xgb.DMatrix(data = xtest, label = ytest)
+
+```
+
+### Fitting the model and prediction
+---
+
+### We'll define the model by using the xgboost() function of xgboost package. Here, we'll set 'max_depth' and 'nrounds' parameters. A 'max_depth' defines the depth of trees that the higher value is the more complex the model is. An 'nrounds' is the maximum number of iteration.
+
+```{r}
+
+xgbc = xgboost(data = xgb_train, max.depth = 2, nrounds = 50)
+print(xgbc)
+
+```
+
+### Predicting Values
+
+Next, we'll predict the x test data with the xgbc model
+
+```{r}
+pred_y = predict(xgbc, xgb_test)
+
+```
+
+### Actual vs Predicted Values
+
+We'll visualize y original test and y predicted data in a plot
+```{r}
+x = 1:length(ytest)
+plot(x, ytest, col = "red", type = "l")
+lines(x, pred_y, col = "blue", type = "l")
+legend(x = 1, y = 38,  legend = c("original test_y", "predicted test_y"), 
+       col = c("red", "blue"), box.lty = 1, cex = 0.8, lty = c(1, 1))
+
+```
+
+Inference:- From graph we can infer that almost actual and predicted values are similar
+
+### Metrics
+
+```{r}
+mse = mean((ytest - pred_y)^2)
+mae = caret::MAE(ytest, pred_y)
+rmse = caret::RMSE(ytest, pred_y)
+
+cat("MSE: ", mse, "MAE: ", mae, " RMSE: ", rmse)
+
+```
+
+
+### R-Square
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((pred_y - ytest)^2)
+
+rsquare_ridge <- 1-(sse/sst)
+rsquare_ridge
+rsquare_ridge_1 <- rsquare_ridge
+```
+
+
+### Adjusted R-Square
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 10
+
+arsquare_ridge <- (1-((1-rsquare_ridge)*(n-1)/(n-p-1)))
+arsquare_ridge
+
+
+```
+
+### ------------ Model - 2 ------------------
+
+```{r}
+
+df1 <- data.frame(df$SalePrice , df$OverallQual , df$GrLivArea  ,df$GarageCars,df$GarageArea ,df$TotalBsmtSF,df$X1stFlrSF ,df$FullBath ,df$YearBuilt  ,df$YearRemodAdd ,df$MasVnrArea)
+
+head(df1)
+
+
+```
+
+### Train/Set 80/20
+```{r}
+
+set.seed(123)
+size <- floor(0.8* nrow(df1))
+
+```
+
+
+### Training Dataset
+```{r}
+
+train_ind <- sample(seq_len(nrow(df1)), size = size)
+train <- df1[train_ind, ]
+xtrain <- train[,c(2,3,4,5,6,7,8,9,10,11)]
+ytrain <- train[,1]
+
+
+```
+
+### Testing Dataset
+
+```{r}
+
+test <- df1[-train_ind, ]
+xtest <- test[,c(2,3,4,5,6,7,8,9,10,11)]
+ytest <- test[,1]
+
+xtrain <- as.matrix(xtrain)
+ytrain <- as.matrix(ytrain)
+xtest <- as.matrix(xtest)
+ytest <- as.matrix(ytest)
+
+
+```
+
+### XGB 
+
+```{r}
+
+xgb_train = xgb.DMatrix(data = xtrain, label = ytrain)
+xgb_test = xgb.DMatrix(data = xtest, label = ytest)
+
+```
+
+```{r}
+
+xgbc = xgboost(data = xgb_train, max.depth = 2, nrounds = 50)
+print(xgbc)
+
+```
+
+### Predicting Values
+
+```{r}
+
+pred_y = predict(xgbc, xgb_test)
+
+```
+
+### Actual vs Predicted Values
+
+We'll visualize y original test and y predicted data in a plot
+
+```{r}
+x = 1:length(ytest)
+plot(x, ytest, col = "red", type = "l")
+lines(x, pred_y, col = "blue", type = "l")
+legend(x = 1, y = 38,  legend = c("original test_y", "predicted test_y"), 
+       col = c("red", "blue"), box.lty = 1, cex = 0.8, lty = c(1, 1))
+
+```
+
+## Inference:- 
+### From graph we can infer that almost actual and predicted values are similar
+
+### Metrics
+
+```{r}
+mse = mean((ytest - pred_y)^2)
+mae = caret::MAE(ytest, pred_y)
+rmse = caret::RMSE(ytest, pred_y)
+
+cat("MSE: ", mse, "MAE: ", mae, " RMSE: ", rmse)
+
+```
+
+### R-Square
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((pred_y - ytest)^2)
+
+rsquare_ridge <- 1-(sse/sst)
+rsquare_ridge
+rsquare_ridge_1 <- rsquare_ridge
+```
+
+### Adjusted R-Square
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 10
+
+arsquare_ridge <- (1-((1-rsquare_ridge)*(n-1)/(n-p-1)))
+arsquare_ridge
+
+
+```
+
+
+### ------------ Model - 3 ------------------
+
+```{r}
+
+df1 <- data.frame(df$SalePrice , df$OverallQual , df$GrLivArea  ,df$GarageCars,df$GarageArea ,df$TotalBsmtSF,df$X1stFlrSF ,df$FullBath ,df$YearBuilt  ,df$YearRemodAdd ,df$MasVnrArea,df$TotRmsAbvGrd)
+
+head(df1)
+
+
+```
+
+### Train/Set 80/20
+```{r}
+
+set.seed(123)
+size <- floor(0.8* nrow(df1))
+
+```
+
+
+### Training Dataset
+```{r}
+
+train_ind <- sample(seq_len(nrow(df1)), size = size)
+train <- df1[train_ind, ]
+xtrain <- train[,c(2,3,4,5,6,7,8,9,10,11,12)]
+ytrain <- train[,1]
+
+
+```
+
+### Testing Dataset
+
+```{r}
+
+test <- df1[-train_ind, ]
+xtest <- test[,c(2,3,4,5,6,7,8,9,10,11,12)]
+ytest <- test[,1]
+
+
+xtrain <- as.matrix(xtrain)
+ytrain <- as.matrix(ytrain)
+xtest <- as.matrix(xtest)
+ytest <- as.matrix(ytest)
+
+
+```
+
+### XGB 
+
+```{r}
+
+xgb_train = xgb.DMatrix(data = xtrain, label = ytrain)
+xgb_test = xgb.DMatrix(data = xtest, label = ytest)
+
+```
+
+```{r}
+
+xgbc = xgboost(data = xgb_train, max.depth = 2, nrounds = 50)
+print(xgbc)
+
+```
+### Predicting Values
+
+```{r}
+
+pred_y = predict(xgbc, xgb_test)
+
+```
+
+### Actual vs Predicted Value
+
+```{r}
+x = 1:length(ytest)
+plot(x, ytest, col = "red", type = "l")
+lines(x, pred_y, col = "blue", type = "l")
+legend(x = 1, y = 38,  legend = c("original test_y", "predicted test_y"), 
+       col = c("red", "blue"), box.lty = 1, cex = 0.8, lty = c(1, 1))
+
+```
+
+### Inference:- From graph we can infer that almost actual and predicted values are similar
+
+### Metrics
+
+```{r}
+mse = mean((ytest - pred_y)^2)
+mae = caret::MAE(ytest, pred_y)
+rmse = caret::RMSE(ytest, pred_y)
+
+cat("MSE: ", mse, "MAE: ", mae, " RMSE: ", rmse)
+
+```
+
+### R-Square
+```{r}
+sst <- sum((ytest - mean(ytest))^2)
+sse <- sum((pred_y - ytest)^2)
+
+rsquare_ridge <- 1-(sse/sst)
+rsquare_ridge
+rsquare_ridge_1 <- rsquare_ridge
+```
+
+### Adjusted R-Square
+```{r}
+
+n <- nrow(as.matrix(ytest))
+p <- 10
+
+arsquare_ridge <- (1-((1-rsquare_ridge)*(n-1)/(n-p-1)))
+arsquare_ridge
+
+
+```
+
+### Comparison Between Different Model for XGB
+
+```{r}
+model_x <- read.csv("D:\\COllege\\5th sem\\CSE3505\\Project\\Model_XGB.csv")
+model_x
+
+```
+
+##Inference of XGB on 3 Models:-
+---
+### As we now higher values of r square values are preferred and here almost all the three r square value are same and are closer to 1 so its good. Although model 3 have comparatively higher r square value then other two model.
+### In case of Adjusted R2 k lower adjusted r2 values are preferred.Here also adjusted r2  value for all the 3 models are same but model3 has lower compared to other two.
+### Also in case of RMSE,MSE and MAE lower values are better.Thus compared to other three models model2 have lower RMSE,MSE,MAE values.
+
