@@ -8,13 +8,7 @@ output:
   pdf_document: default
   word_document: default
 ---
-### Reg. No and Name:
 
-  19BPS1012 Apurv Doddamani
-  
-  19BPS1048 Anushka Pandey
-  
-  19BPS1092 Mithun P
 
 * * *
 ### Dataset Description
